@@ -22,6 +22,7 @@
 (define-constant ERR_INVALID_START_BURN_HEIGHT 24)
 (define-constant ERR_NOT_CURRENT_STACKER 25)
 (define-constant ERR_STACK_EXTEND_NOT_LOCKED 26)
+(define-constant ERR_STACK_INCREASE_NOT_LOCKED 27)
 
 ;; PoX disabling threshold (a percent)
 (define-constant POX_REJECTION_FRACTION u25)
@@ -63,8 +64,6 @@
 (define-map stacking-state
     { stacker: principal }
     {
-        ;; how many uSTX locked?
-        amount-ustx: uint,
         ;; Description of the underlying burnchain address that will
         ;; receive PoX'ed tokens. Translating this into an address
         ;; depends on the burnchain being used.  When Bitcoin is
@@ -560,8 +559,7 @@
           ;; add stacker record
          (map-set stacking-state
            { stacker: tx-sender }
-           { amount-ustx: amount-ustx,
-             pox-addr: pox-addr,
+           { pox-addr: pox-addr,
              reward-set-indexes: reward-set-indexes,
              first-reward-cycle: first-reward-cycle,
              lock-period: lock-period })
@@ -703,8 +701,7 @@
       ;; add stacker record
       (map-set stacking-state
         { stacker: stacker }
-        { amount-ustx: amount-ustx,
-          pox-addr: pox-addr,
+        { pox-addr: pox-addr,
           first-reward-cycle: first-reward-cycle,
           reward-set-indexes: (list),
           lock-period: lock-period })
@@ -761,6 +758,68 @@
     })
 )
 
+(define-private (increase-reward-cycle-entry 
+                  (reward-cycle-index uint)
+                  (updates (optional { first-cycle: uint, reward-cycle: uint, stacker: principal, add-amount: uint })))
+    (let ((data (try! updates))
+          (first-cycle (get first-cycle data))
+          (reward-cycle (get reward-cycle data)))
+    (if (> first-cycle reward-cycle)
+        ;; not at first cycle to process yet
+        (some { first-cycle: first-cycle, reward-cycle: (+ u1 reward-cycle), stacker: (get stacker data), add-amount: (get add-amount data) })
+        (let ((existing-entry (unwrap-panic (map-get? reward-cycle-pox-address-list { reward-cycle: reward-cycle, index: reward-cycle-index })))
+              (existing-total (unwrap-panic (map-get? reward-cycle-total-stacked { reward-cycle: reward-cycle })))
+              (total-ustx (+ (get total-ustx existing-total) (get add-amount data))))
+            ;; stacker must match
+            (asserts! (is-eq (get stacker existing-entry) (some (get stacker data))) none)
+            ;; update the pox-address list
+            (map-set reward-cycle-pox-address-list
+                     { reward-cycle: reward-cycle, index: reward-cycle-index }
+                     { pox-addr: (get pox-addr existing-entry),
+                       total-ustx: total-ustx,
+                       stacker: (some (get stacker data)) })
+            ;; update the total
+            (map-set reward-cycle-total-stacked 
+                     { reward-cycle: reward-cycle }
+                     { total-ustx: total-ustx })
+            (some { first-cycle: first-cycle,
+                    reward-cycle: (+ u1 reward-cycle),
+                    stacker: (get stacker data),
+                    add-amount: (get add-amount data) })))))
+
+(define-public (stack-increase (increase-by uint))
+   (let ((stacker-info (stx-account tx-sender))
+         (amount-stacked (get locked stacker-info))
+         (amount-unlocked (get unlocked stacker-info))
+         (unlock-height (get unlock-height stacker-info))
+         (unlock-in-cycle (burn-height-to-reward-cycle unlock-height))
+         (cur-cycle (current-pox-reward-cycle))
+         (first-increased-cycle (+ cur-cycle u1))
+         (stacker-state (unwrap! (map-get? stacking-state 
+                                          { stacker: tx-sender })
+                                          (err ERR_STACK_EXTEND_NOT_LOCKED))))
+      (asserts! (> amount-stacked u0)
+                (err ERR_STACK_EXTEND_NOT_LOCKED))
+      (asserts! (>= increase-by u1)
+                (err ERR_STACKING_INVALID_AMOUNT))
+      (asserts! (>= amount-unlocked increase-by)
+                (err ERR_STACKING_INSUFFICIENT_FUNDS))
+      (asserts! (check-caller-allowed)
+                (err ERR_STACKING_PERMISSION_DENIED))
+      ;; stacker must be directly stacking
+      (asserts! (> (len (get reward-set-indexes stacker-state)) u0)
+                (err ERR_STACKING_ALREADY_DELEGATED))
+      ;; update reward cycle amounts
+      (asserts! (is-some (fold increase-reward-cycle-entry 
+            (get reward-set-indexes stacker-state)
+            (some { first-cycle: first-increased-cycle,
+                    reward-cycle: (get first-reward-cycle stacker-state),
+                    stacker: tx-sender,
+                    add-amount: increase-by })))
+            (err ERR_STACKING_UNREACHABLE))
+      ;; NOTE: stacking-state map is unchanged: it no longer tracks amount-stacked in PoX-2
+      (ok { stacker: tx-sender, total-locked: (+ amount-stacked increase-by)})))
+
 ;; Extend an active stacking lock.
 ;; *New in Stacks 2.1*
 ;; This method extends the `tx-sender`'s current lockup for an additional `extend-count`
@@ -811,14 +870,91 @@
           ;; update stacker record
           (map-set stacking-state
             { stacker: tx-sender }
-            { amount-ustx: amount-ustx,
-              pox-addr: pox-addr,
+            { pox-addr: pox-addr,
               reward-set-indexes: reward-set-indexes,
               first-reward-cycle: cur-cycle,
               lock-period: lock-period })
 
         ;; return lock-up information
         (ok { stacker: tx-sender, unlock-burn-height: new-unlock-ht })))))
+
+;; As a delegator, increase an active stacking lock, issuing a "partial commitment" for the
+;;   increased cycles.
+;; *New in Stacks 2.1*
+;; This method increases `stacker`'s current lockup and partially commits the additional
+;;   STX to `pox-addr`
+(define-public (delegate-stack-increase
+                    (stacker principal)
+                    (pox-addr { version: (buff 1), hashbytes: (buff 20) })
+                    (increase-by uint))
+    (let ((stacker-info (stx-account stacker))
+          (existing-lock (get locked stacker-info))
+          (available-stx (get unlocked stacker-info))
+          (unlock-height (get unlock-height stacker-info)))
+
+     ;; must be called with positive `increase-by`
+     (asserts! (>= increase-by u1)
+               (err ERR_STACKING_INVALID_AMOUNT))
+
+     (let ((unlock-in-cycle (burn-height-to-reward-cycle unlock-height))
+           (cur-cycle (current-pox-reward-cycle))
+           (first-increase-cycle (+ cur-cycle u1))
+           (last-increase-cycle (- unlock-in-cycle u1))
+           (cycle-count (try! (if (<= first-increase-cycle last-increase-cycle)
+                                  (ok (+ u1 (- last-increase-cycle first-increase-cycle)))
+                                  (err ERR_STACKING_INVALID_LOCK_PERIOD))))
+           (new-total-locked (+ increase-by existing-lock))
+           (stacker-state 
+                (unwrap! (map-get? stacking-state { stacker: stacker })
+                 (err ERR_STACK_INCREASE_NOT_LOCKED))))
+
+      ;; must be called directly by the tx-sender or by an allowed contract-caller
+      (asserts! (check-caller-allowed)
+        (err ERR_STACKING_PERMISSION_DENIED))
+
+      ;; stacker must be currently locked
+      (asserts! (> existing-lock u0)
+        (err ERR_STACK_INCREASE_NOT_LOCKED))
+
+      ;; stacker must have enough stx to lock
+      (asserts! (>= available-stx increase-by)
+        (err ERR_STACKING_INSUFFICIENT_FUNDS))
+
+      ;; stacker must have delegated to the caller
+      (let ((delegation-info (unwrap! (get-check-delegation stacker) (err ERR_STACKING_PERMISSION_DENIED)))
+            (delegated-to (get delegated-to delegation-info))
+            (delegated-amount (get amount-ustx delegation-info))
+            (delegated-pox-addr (get pox-addr delegation-info))
+            (delegated-until (get until-burn-ht delegation-info)))
+        ;; must have delegated to tx-sender
+        (asserts! (is-eq delegated-to tx-sender)
+                  (err ERR_STACKING_PERMISSION_DENIED))
+        ;; must have delegated enough stx
+        (asserts! (>= delegated-amount new-total-locked)
+                  (err ERR_DELEGATION_TOO_MUCH_LOCKED))
+        ;; if pox-addr is set, must be equal to pox-addr
+        (asserts! (match delegated-pox-addr
+                         specified-pox-addr (is-eq pox-addr specified-pox-addr)
+                         true)
+                  (err ERR_DELEGATION_POX_ADDR_REQUIRED))
+        ;; delegation must not expire before lock period
+        (asserts! (match delegated-until
+                        until-burn-ht
+                            (>= until-burn-ht unlock-height)
+                        true)
+                  (err ERR_DELEGATION_EXPIRES_DURING_LOCK)))
+
+      ;; delegate stacking does minimal-can-stack-stx
+      (try! (minimal-can-stack-stx pox-addr new-total-locked first-increase-cycle (+ u1 (- last-increase-cycle first-increase-cycle))))
+
+      ;; register the PoX address with the amount stacked via partial stacking
+      ;;   before it can be included in the reward set, this must be committed!
+      (add-pox-partial-stacked pox-addr first-increase-cycle cycle-count increase-by)
+
+      ;; stacking-state is unchanged, so no need to update
+
+      ;; return the lock-up information, so the node can actually carry out the lock. 
+      (ok { stacker: stacker, total-locked: new-total-locked}))))
 
 ;; As a delegator, extend an active stacking lock, issuing a "partial commitment" for the
 ;;   extended-to cycles.
@@ -894,8 +1030,7 @@
       ;; update stacker record
       (map-set stacking-state
         { stacker: stacker }
-        { amount-ustx: amount-ustx,
-          pox-addr: pox-addr,
+        { pox-addr: pox-addr,
           reward-set-indexes: (list),
           first-reward-cycle: first-extend-cycle,
           lock-period: lock-period })
