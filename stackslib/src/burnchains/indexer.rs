@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::burnchains::BurnchainBlock;
-use crate::burnchains::Error as burnchain_error;
-use crate::burnchains::*;
-
+use crate::burnchains::{BurnchainBlock, Error as burnchain_error, *};
 use crate::core::{StacksEpoch, StacksEpochId};
 use crate::types::chainstate::BurnchainHeaderHash;
 

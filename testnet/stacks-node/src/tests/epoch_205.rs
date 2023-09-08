@@ -1,54 +1,38 @@
 use std::collections::HashMap;
-use std::env;
+use std::convert::TryFrom;
 use std::sync::atomic::Ordering;
-use std::thread;
+use std::{env, thread};
 
-use stacks::burnchains::Burnchain;
-use stacks::burnchains::Txid;
-use stacks::chainstate::burn::operations::BlockstackOperationType;
+use stacks::burnchains::{Burnchain, Txid};
+use stacks::chainstate::burn::operations::leader_block_commit::BURN_BLOCK_MINED_AT_MODULUS;
+use stacks::chainstate::burn::operations::{BlockstackOperationType, LeaderBlockCommitOp};
+use stacks::chainstate::stacks::address::PoxAddress;
 use stacks::chainstate::stacks::db::StacksChainState;
-use stacks::chainstate::stacks::StacksBlockHeader;
-use stacks::chainstate::stacks::StacksPrivateKey;
-use stacks::chainstate::stacks::StacksTransaction;
-use stacks::chainstate::stacks::TransactionPayload;
-use stacks::codec::StacksMessageCodec;
-use stacks::core::StacksEpoch;
-use stacks::core::StacksEpochId;
-use stacks::core::{
-    PEER_VERSION_EPOCH_1_0, PEER_VERSION_EPOCH_2_0, PEER_VERSION_EPOCH_2_05, PEER_VERSION_EPOCH_2_1,
+use stacks::chainstate::stacks::{
+    StacksBlockHeader, StacksPrivateKey, StacksTransaction, TransactionPayload,
 };
-use stacks::types::chainstate::BlockHeaderHash;
-use stacks::types::chainstate::BurnchainHeaderHash;
-use stacks::types::chainstate::StacksAddress;
+use stacks::codec::StacksMessageCodec;
+use stacks::core;
+use stacks::core::{
+    StacksEpoch, StacksEpochId, PEER_VERSION_EPOCH_1_0, PEER_VERSION_EPOCH_2_0,
+    PEER_VERSION_EPOCH_2_05, PEER_VERSION_EPOCH_2_1,
+};
+use stacks::types::chainstate::{BlockHeaderHash, BurnchainHeaderHash, StacksAddress, VRFSeed};
 use stacks::util::hash::hex_bytes;
 use stacks::util::sleep_ms;
+use stacks::vm::costs::ExecutionCost;
 use stacks::vm::types::PrincipalData;
 use stacks::vm::ContractName;
-use std::convert::TryFrom;
 
-use crate::config::EventKeyType;
-use crate::config::EventObserverConfig;
-use crate::config::InitialBalance;
-use crate::neon;
+use crate::config::{EventKeyType, EventObserverConfig, InitialBalance};
 use crate::tests::bitcoin_regtest::BitcoinCoreController;
-use crate::tests::make_contract_call;
-use crate::tests::make_contract_call_mblock_only;
-use crate::tests::make_contract_publish;
-use crate::tests::make_contract_publish_microblock_only;
 use crate::tests::neon_integrations::*;
-use crate::tests::run_until_burnchain_height;
-use crate::tests::select_transactions_where;
-use crate::tests::to_addr;
-use crate::BitcoinRegtestController;
-use crate::BurnchainController;
-use crate::Keychain;
-use stacks::core;
-
-use stacks::chainstate::burn::operations::leader_block_commit::BURN_BLOCK_MINED_AT_MODULUS;
-use stacks::chainstate::burn::operations::LeaderBlockCommitOp;
-use stacks::chainstate::stacks::address::PoxAddress;
-use stacks::types::chainstate::VRFSeed;
-use stacks::vm::costs::ExecutionCost;
+use crate::tests::{
+    make_contract_call, make_contract_call_mblock_only, make_contract_publish,
+    make_contract_publish_microblock_only, run_until_burnchain_height, select_transactions_where,
+    to_addr,
+};
+use crate::{neon, BitcoinRegtestController, BurnchainController, Keychain};
 
 #[test]
 #[ignore]

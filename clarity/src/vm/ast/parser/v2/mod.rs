@@ -1138,14 +1138,11 @@ pub fn parse_collect_diagnostics(
 
 #[cfg(test)]
 mod tests {
-    use crate::vm::{
-        diagnostic::Level,
-        types::{
-            ASCIIData, CharType, PrincipalData, SequenceData, StandardPrincipalData, UTF8Data,
-        },
-    };
-
     use super::*;
+    use crate::vm::diagnostic::Level;
+    use crate::vm::types::{
+        ASCIIData, CharType, PrincipalData, SequenceData, StandardPrincipalData, UTF8Data,
+    };
 
     #[test]
     fn test_parse_int() {

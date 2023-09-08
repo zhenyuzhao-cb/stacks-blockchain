@@ -3,11 +3,12 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 use rand::RngCore;
-
+use stacks::address::AddressHashMode;
 use stacks::chainstate::burn::ConsensusHash;
+use stacks::chainstate::stacks::db::StacksChainState;
 use stacks::chainstate::stacks::events::StacksTransactionEvent;
+use stacks::chainstate::stacks::miner::{BlockBuilderSettings, StacksMicroblockBuilder};
 use stacks::chainstate::stacks::{
-    db::StacksChainState, miner::BlockBuilderSettings, miner::StacksMicroblockBuilder,
     CoinbasePayload, StacksBlock, StacksMicroblock, StacksMicroblockHeader, StacksPrivateKey,
     StacksPublicKey, StacksTransaction, StacksTransactionSigner, TokenTransferMemo,
     TransactionAnchorMode, TransactionAuth, TransactionContractCall, TransactionPayload,
@@ -15,28 +16,22 @@ use stacks::chainstate::stacks::{
     TransactionVersion, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
 use stacks::codec::StacksMessageCodec;
-use stacks::core::CHAIN_ID_TESTNET;
+use stacks::core::{StacksEpoch, StacksEpochExtension, StacksEpochId, CHAIN_ID_TESTNET};
 use stacks::types::chainstate::StacksAddress;
 use stacks::util::get_epoch_time_secs;
-use stacks::util::hash::hex_bytes;
+use stacks::util::hash::{hex_bytes, to_hex};
 use stacks::util_lib::strings::StacksString;
 use stacks::vm::costs::ExecutionCost;
 use stacks::vm::database::BurnStateDB;
 use stacks::vm::events::STXEventType;
 use stacks::vm::types::PrincipalData;
 use stacks::vm::{ClarityName, ContractName, Value};
-use stacks::{address::AddressHashMode, util::hash::to_hex};
-
-use crate::helium::RunLoop;
-use crate::tests::neon_integrations::get_chain_info;
-use crate::tests::neon_integrations::next_block_and_wait;
-use crate::BitcoinRegtestController;
-use stacks::core::StacksEpoch;
-use stacks::core::StacksEpochExtension;
-use stacks::core::StacksEpochId;
 
 use super::burnchains::bitcoin_regtest_controller::ParsedUTXO;
 use super::Config;
+use crate::helium::RunLoop;
+use crate::tests::neon_integrations::{get_chain_info, next_block_and_wait};
+use crate::BitcoinRegtestController;
 
 mod atlas;
 mod bitcoin_regtest;

@@ -1,15 +1,14 @@
-use crate::burnchains::BurnchainTransaction;
-use crate::burnchains::{BurnchainBlockHeader, Txid};
-use crate::chainstate::burn::operations::Error as op_error;
+use std::io::{Read, Write};
+
+use crate::burnchains::{BurnchainBlockHeader, BurnchainTransaction, Txid};
 use crate::chainstate::burn::operations::{
     parse_u128_from_be, parse_u32_from_be, parse_u64_from_be, BlockstackOperationType,
-    DelegateStxOp, PreStxOp,
+    DelegateStxOp, Error as op_error, PreStxOp,
 };
 use crate::chainstate::burn::Opcodes;
 use crate::chainstate::stacks::address::PoxAddress;
 use crate::codec::{write_next, Error as codec_error, StacksMessageCodec};
 use crate::types::chainstate::{BurnchainHeaderHash, StacksAddress};
-use std::io::{Read, Write};
 
 struct ParsedData {
     delegated_ustx: u128,
@@ -260,24 +259,22 @@ impl StacksMessageCodec for DelegateStxOp {
 }
 
 mod tests {
-    use crate::burnchains::bitcoin::address::{
-        BitcoinAddress, LegacyBitcoinAddress, LegacyBitcoinAddressType,
-    };
-    use crate::burnchains::bitcoin::BitcoinTxInputStructured;
-    use crate::burnchains::bitcoin::{
-        BitcoinInputType, BitcoinNetworkType, BitcoinTxInput, BitcoinTxOutput,
-    };
-    use crate::burnchains::BurnchainTransaction;
-    use crate::burnchains::{bitcoin::BitcoinTransaction, Txid};
-    use crate::chainstate::burn::operations::DelegateStxOp;
-    use crate::chainstate::burn::operations::Error as op_error;
-    use crate::chainstate::burn::Opcodes;
-    use crate::chainstate::stacks::address::PoxAddress;
-    use crate::chainstate::stacks::address::StacksAddressExtensions;
-    use crate::types::chainstate::StacksAddress;
     use clarity::address::AddressHashMode;
     use clarity::types::chainstate::BurnchainHeaderHash;
     use stacks_common::util::hash::*;
+
+    use crate::burnchains::bitcoin::address::{
+        BitcoinAddress, LegacyBitcoinAddress, LegacyBitcoinAddressType,
+    };
+    use crate::burnchains::bitcoin::{
+        BitcoinInputType, BitcoinNetworkType, BitcoinTransaction, BitcoinTxInput,
+        BitcoinTxInputStructured, BitcoinTxOutput,
+    };
+    use crate::burnchains::{BurnchainTransaction, Txid};
+    use crate::chainstate::burn::operations::{DelegateStxOp, Error as op_error};
+    use crate::chainstate::burn::Opcodes;
+    use crate::chainstate::stacks::address::{PoxAddress, StacksAddressExtensions};
+    use crate::types::chainstate::StacksAddress;
 
     // Parse a DelegateStx op in which the height is set to None.
     #[test]

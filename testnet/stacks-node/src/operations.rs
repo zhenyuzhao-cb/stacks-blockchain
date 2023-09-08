@@ -1,5 +1,6 @@
+use stacks::burnchains::PrivateKey;
+use stacks::util::hash::hex_bytes;
 use stacks::util::secp256k1::{MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey};
-use stacks::{burnchains::PrivateKey, util::hash::hex_bytes};
 
 pub struct BurnchainOpSigner {
     secret_key: Secp256k1PrivateKey,

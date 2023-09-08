@@ -101,14 +101,14 @@ you push your code. Follow these instruction to set it up:
 #!/bin/sh
 HAS_ISSUES=0
 for file in $(git diff --name-only --staged); do
-    FMT_RESULT="$(rustfmt $file --check --config group_imports=StdExternalCrate 2>/dev/null || true)"
+    FMT_RESULT="$(rustfmt $file --check --config group_imports=StdExternalCrate,imports_granularity=Module 2>/dev/null || true)"
     if [ "$FMT_RESULT" != "" ]; then
         HAS_ISSUES=1
     fi
 done
 if [ $HAS_ISSUES -eq 1 ]
 then
-    echo 'rustfmt failed: run "cargo fmt --all -- --config group_imports=StdExternalCrate"'
+    echo 'rustfmt failed: run "cargo fmt --all -- --config group_imports=StdExternalCrate,imports_granularity=Module"'
 fi
 exit $HAS_ISSUES
 ```
@@ -397,13 +397,13 @@ properly formatted.
 You can check the formatting locally via:
 
 ```bash
-cargo fmt --all -- --check --config group_imports=StdExternalCrate
+cargo fmt --all -- --check --config group_imports=StdExternalCrate,imports_granularity=Module
 ```
 
 You can automatically reformat your commit via:
 
 ```bash
-cargo fmt --all -- --config group_imports=StdExternalCrate
+cargo fmt --all -- --config group_imports=StdExternalCrate,imports_granularity=Module
 ```
 
 ## Comments

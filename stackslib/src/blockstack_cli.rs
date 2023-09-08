@@ -26,17 +26,15 @@ use std::io::prelude::*;
 use std::io::Read;
 use std::{env, fs, io};
 
-use blockstack_lib::address::b58;
-use blockstack_lib::address::AddressHashMode;
+use blockstack_lib::address::{b58, AddressHashMode};
 use blockstack_lib::burnchains::bitcoin::address::{
     ADDRESS_VERSION_MAINNET_SINGLESIG, ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
 use blockstack_lib::burnchains::Address;
-use blockstack_lib::chainstate::stacks::StacksBlockHeader;
 use blockstack_lib::chainstate::stacks::{
-    StacksBlock, StacksMicroblock, StacksPrivateKey, StacksPublicKey, StacksTransaction,
-    StacksTransactionSigner, TokenTransferMemo, TransactionAnchorMode, TransactionAuth,
-    TransactionContractCall, TransactionPayload, TransactionSmartContract,
+    StacksBlock, StacksBlockHeader, StacksMicroblock, StacksPrivateKey, StacksPublicKey,
+    StacksTransaction, StacksTransactionSigner, TokenTransferMemo, TransactionAnchorMode,
+    TransactionAuth, TransactionContractCall, TransactionPayload, TransactionSmartContract,
     TransactionSpendingCondition, TransactionVersion, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
@@ -45,16 +43,12 @@ use blockstack_lib::codec::{Error as CodecError, StacksMessageCodec};
 use blockstack_lib::core::{CHAIN_ID_MAINNET, CHAIN_ID_TESTNET};
 use blockstack_lib::net::Error as NetError;
 use blockstack_lib::types::chainstate::StacksAddress;
-use blockstack_lib::util::hash::hex_bytes;
-use blockstack_lib::util::hash::to_hex;
+use blockstack_lib::util::hash::{hex_bytes, to_hex};
 use blockstack_lib::util::retry::LogReader;
 use blockstack_lib::util_lib::strings::StacksString;
-use blockstack_lib::vm::ClarityVersion;
-use blockstack_lib::vm::{
-    errors::{Error as ClarityError, RuntimeErrorType},
-    types::PrincipalData,
-    ClarityName, ContractName, Value,
-};
+use blockstack_lib::vm::errors::{Error as ClarityError, RuntimeErrorType};
+use blockstack_lib::vm::types::PrincipalData;
+use blockstack_lib::vm::{ClarityName, ClarityVersion, ContractName, Value};
 
 const USAGE: &str = "blockstack-cli (options) [method] [args...]
 
