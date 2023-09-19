@@ -142,7 +142,7 @@ impl SugarExpander {
             #[cfg(feature = "developer-mode")]
             // If there were comments above this expression, attach them.
             if !comments.is_empty() {
-                expr.pre_comments = std::mem::replace(&mut comments, Vec::new());
+                expr.pre_comments = std::mem::take(&mut comments);
             }
 
             expressions.push(expr);
