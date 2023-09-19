@@ -575,8 +575,8 @@ impl<D: SimpleDecoder> ConsensusDecodable<D> for Transaction {
             match segwit_flag {
                 // Empty tx
                 0 => Ok(Transaction {
-                    version: version,
-                    input: input,
+                    version,
+                    input,
                     output: vec![],
                     lock_time: ConsensusDecodable::consensus_decode(d)?,
                 }),
@@ -593,9 +593,9 @@ impl<D: SimpleDecoder> ConsensusDecodable<D> for Transaction {
                         ))
                     } else {
                         Ok(Transaction {
-                            version: version,
-                            input: input,
-                            output: output,
+                            version,
+                            input,
+                            output,
                             lock_time: ConsensusDecodable::consensus_decode(d)?,
                         })
                     }
@@ -606,8 +606,8 @@ impl<D: SimpleDecoder> ConsensusDecodable<D> for Transaction {
         // non-segwit
         } else {
             Ok(Transaction {
-                version: version,
-                input: input,
+                version,
+                input,
                 output: ConsensusDecodable::consensus_decode(d)?,
                 lock_time: ConsensusDecodable::consensus_decode(d)?,
             })
