@@ -970,12 +970,6 @@ impl StacksChainState {
 
                 let (result, asset_map, events) = match contract_call_resp {
                     Ok((return_value, asset_map, events)) => {
-                        info!("Contract-call successfully processed";
-                              "contract_name" => %contract_id,
-                              "function_name" => %contract_call.function_name,
-                              "function_args" => %VecDisplay(&contract_call.function_args),
-                              "return_value" => %return_value,
-                              "cost" => ?total_cost);
                         (return_value, asset_map, events)
                     }
                     Err(e) => match handle_clarity_runtime_error(e) {
@@ -1130,11 +1124,6 @@ impl StacksChainState {
                                     .sub(&cost_before)
                                     .expect("BUG: total block cost decreased");
 
-                                warn!(
-                                    "Runtime error in contract analysis for {}: {:?}",
-                                    &contract_id, &other_error;
-                                    "AST rules" => %format!("{:?}", &ast_rules)
-                                );
                                 let receipt = StacksTransactionReceipt::from_analysis_failure(
                                     tx.clone(),
                                     analysis_cost,
