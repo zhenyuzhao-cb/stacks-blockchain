@@ -977,7 +977,7 @@ impl StacksChainState {
                             info!("Contract-call processed with {}", err_type;
                                       "contract_name" => %contract_id,
                                       "function_name" => %contract_call.function_name,
-                                      "function_args" => %VecDisplay(&contract_call.function_args),
+                                    //   "function_args" => %VecDisplay(&contract_call.function_args),
                                       "error" => ?error);
                             (Value::err_none(), AssetMap::new(), vec![])
                         }
